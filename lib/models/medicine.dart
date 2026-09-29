@@ -1,52 +1,109 @@
 import 'package:flutter/material.dart';
 
-/// Represents one medicine entry with its reminder times.
 class Medicine {
-  final String id;
-  String name;
-  String dosage; // e.g. "500mg" or "1 tablet"
-  String notes;
-  List<TimeOfDay> reminderTimes;
-  bool isActive;
-
   Medicine({
     required this.id,
     required this.name,
     required this.dosage,
+    List<TimeOfDay>? times,
+    List<TimeOfDay>? reminderTimes,
+    this.form = 'Tablet',
     this.notes = '',
-    required this.reminderTimes,
-    this.isActive = true,
-  });
+    bool? active,
+    bool? isActive,
+  })  : times = List<TimeOfDay>.from(times ?? reminderTimes ?? const []),
+        active = active ?? isActive ?? true;
+
+  factory Medicine.fromJson(Map<String, dynamic> json) {
+    final rawTimes = json['reminderTimes'] ?? json['times'] ?? const <dynamic>[];
+    final times = (rawTimes as List<dynamic>?)
+            ?.map((entry) {
+              if (entry is Map<String, dynamic>) {
+                final hour = entry['hour'] as int? ?? 0;
+                final minute = entry['minute'] as int? ?? 0;
+                return TimeOfDay(hour: hour, minute: minute);
+              }
+              return const TimeOfDay(hour: 0, minute: 0);
+            })
+            .toList() ??
+        <TimeOfDay>[];
+
+    return Medicine(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      dosage: json['dosage']?.toString() ?? '',
+      times: times,
+      form: json['form']?.toString() ?? 'Tablet',
+      notes: json['notes']?.toString() ?? '',
+      active: json['active'] as bool? ?? json['isActive'] as bool? ?? true,
+      isActive: json['isActive'] as bool? ?? json['active'] as bool? ?? true,
+    );
+  }
+
+  final String id;
+  String name;
+  String dosage;
+  String form;
+  String notes;
+  bool active;
+  List<TimeOfDay> times;
+
+  List<TimeOfDay> get reminderTimes => times;
+  set reminderTimes(List<TimeOfDay> value) => times = List<TimeOfDay>.from(value);
+
+  bool get isActive => active;
+  set isActive(bool value) => active = value;
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'name': name,
       'dosage': dosage,
+      'form': form,
       'notes': notes,
-      'reminderTimes': reminderTimes
-          .map((t) => '${t.hour}:${t.minute}')
+      'active': active,
+      'isActive': active,
+      'reminderTimes': times
+          .map((time) => {'hour': time.hour, 'minute': time.minute})
           .toList(),
-      'isActive': isActive,
+      'times': times
+          .map((time) => {'hour': time.hour, 'minute': time.minute})
+          .toList(),
     };
   }
 
-  factory Medicine.fromJson(Map<String, dynamic> json) {
-    return Medicine(
-      id: json['id'],
-      name: json['name'],
-      dosage: json['dosage'],
-      notes: json['notes'] ?? '',
-      reminderTimes: (json['reminderTimes'] as List)
-          .map((s) {
-            final parts = (s as String).split(':');
-            return TimeOfDay(
-              hour: int.parse(parts[0]),
-              minute: int.parse(parts[1]),
-            );
-          })
-          .toList(),
-      isActive: json['isActive'] ?? true,
-    );
+  IconData get icon {
+    switch (form) {
+      case 'Liquid':
+        return Icons.water_drop_outlined;
+      case 'Injection':
+        return Icons.vaccines_outlined;
+      case 'Drops':
+        return Icons.opacity;
+      case 'Capsule':
+        return Icons.medication_liquid_outlined;
+      default:
+        return Icons.medication_outlined;
+    }
   }
+}
+
+enum DoseStatus { pending, taken, skipped }
+
+class DoseLog {
+  DoseLog({
+    required this.medicineId,
+    required this.medicineName,
+    required this.dosage,
+    required this.scheduled,
+    this.status = DoseStatus.pending,
+    this.loggedAt,
+  });
+
+  final String medicineId;
+  final String medicineName;
+  final String dosage;
+  final DateTime scheduled;
+  DoseStatus status;
+  DateTime? loggedAt;
 }

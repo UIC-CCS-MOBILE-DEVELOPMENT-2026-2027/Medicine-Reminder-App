@@ -1,146 +1,209 @@
 import 'package:flutter/material.dart';
 import '../models/medicine.dart';
-import '../services/storage_service.dart';
-import '../services/notification_service.dart';
-import '../widgets/medicine_card.dart';
-import 'add_edit_screen.dart';
+import '../services/medicine_store.dart';
+import '../utils.dart';
+import 'add_medicine_screen.dart';
+import 'history_screen.dart';
+import 'medicine_detail_screen.dart';
+import 'medicine_list_screen.dart';
+import 'settings_screen.dart';
 
-class HomeScreen extends StatefulWidget {
+/// Screen 1 - Home dashboard: today's doses + entry point to every other screen.
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  Widget build(BuildContext context) {
+    final store = MedicineStore.instance;
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) {
+        final doses = store.dosesForToday();
+        final taken = doses.where((d) => d.status == DoseStatus.taken).length;
+        final progress = doses.isEmpty ? 0.0 : taken / doses.length;
+        final cs = Theme.of(context).colorScheme;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text('Hello, ${store.userName}'),
+            actions: [
+              IconButton(
+                tooltip: 'Settings',
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: () => pushPage(context, const SettingsScreen()),
+              ),
+            ],
+          ),
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+            children: [
+              Card(
+                color: cs.primaryContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 72,
+                        height: 72,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            SizedBox.expand(
+                              child: CircularProgressIndicator(value: progress, strokeWidth: 8),
+                            ),
+                            Text('${(progress * 100).round()}%',
+                                style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(formatDate(DateTime.now()),
+                                style: Theme.of(context).textTheme.labelLarge),
+                            const SizedBox(height: 4),
+                            Text('$taken of ${doses.length} doses taken',
+                                style: Theme.of(context).textTheme.titleMedium),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _QuickAction(
+                    icon: Icons.medication_outlined,
+                    label: 'Medicines',
+                    onTap: () => pushPage(context, const MedicineListScreen()),
+                  ),
+                  _QuickAction(
+                    icon: Icons.history,
+                    label: 'History',
+                    onTap: () => pushPage(context, const HistoryScreen()),
+                  ),
+                  _QuickAction(
+                    icon: Icons.settings_outlined,
+                    label: 'Settings',
+                    onTap: () => pushPage(context, const SettingsScreen()),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Text("Today's schedule", style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              if (doses.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(child: Text('No doses scheduled. Tap "Add medicine" to start.')),
+                )
+              else
+                for (final d in doses) _DoseCard(dose: d),
+            ],
+          ),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => pushPage(context, const AddMedicineScreen()),
+            icon: const Icon(Icons.add),
+            label: const Text('Add medicine'),
+          ),
+        );
+      },
+    );
+  }
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  final _storage = StorageService();
-  final _notifications = NotificationService();
-  List<Medicine> _medicines = [];
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadMedicines();
-  }
-
-  Future<void> _loadMedicines() async {
-    final list = await _storage.loadMedicines();
-    setState(() {
-      _medicines = list;
-      _loading = false;
-    });
-  }
-
-  Future<void> _persistAndReschedule() async {
-    await _storage.saveMedicines(_medicines);
-  }
-
-  Future<void> _openAddEdit({Medicine? existing}) async {
-    final result = await Navigator.of(context).push<Medicine>(
-      MaterialPageRoute(
-        builder: (_) => AddEditScreen(medicine: existing),
-      ),
-    );
-
-    if (result == null) return;
-
-    setState(() {
-      if (existing != null) {
-        final index = _medicines.indexWhere((m) => m.id == existing.id);
-        _medicines[index] = result;
-      } else {
-        _medicines.add(result);
-      }
-    });
-
-    await _persistAndReschedule();
-    await _notifications.scheduleForMedicine(result);
-  }
-
-  Future<void> _toggleActive(Medicine medicine, bool value) async {
-    setState(() => medicine.isActive = value);
-    await _persistAndReschedule();
-    await _notifications.scheduleForMedicine(medicine);
-  }
-
-  Future<void> _deleteMedicine(Medicine medicine) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete medicine?'),
-        content: Text('Remove ${medicine.name} and its reminders?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    await _notifications.cancelForMedicine(medicine);
-    setState(() => _medicines.removeWhere((m) => m.id == medicine.id));
-    await _persistAndReschedule();
-  }
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('My Medicines')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _medicines.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-                  padding: const EdgeInsets.only(top: 8, bottom: 80),
-                  itemCount: _medicines.length,
-                  itemBuilder: (context, index) {
-                    final medicine = _medicines[index];
-                    return MedicineCard(
-                      medicine: medicine,
-                      onTap: () => _openAddEdit(existing: medicine),
-                      onToggleActive: (v) => _toggleActive(medicine, v),
-                      onDelete: () => _deleteMedicine(medicine),
-                    );
-                  },
-                ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openAddEdit(),
-        icon: const Icon(Icons.add),
-        label: const Text('Add Medicine'),
+    return Expanded(
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              children: [
+                Icon(icon, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(height: 6),
+                Text(label),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
+}
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
+class _DoseCard extends StatelessWidget {
+  const _DoseCard({required this.dose});
+  final DoseLog dose;
+
+  @override
+  Widget build(BuildContext context) {
+    final store = MedicineStore.instance;
+    final time = TimeOfDay.fromDateTime(dose.scheduled).format(context);
+    final cs = Theme.of(context).colorScheme;
+
+    Widget trailing;
+    IconData leading;
+    Color leadingColor;
+    switch (dose.status) {
+      case DoseStatus.taken:
+        leading = Icons.check_circle;
+        leadingColor = Colors.green;
+        trailing = TextButton(
+          onPressed: () => store.undoDose(dose),
+          child: const Text('Undo'),
+        );
+        break;
+      case DoseStatus.skipped:
+        leading = Icons.remove_circle;
+        leadingColor = cs.outline;
+        trailing = TextButton(
+          onPressed: () => store.undoDose(dose),
+          child: const Text('Undo'),
+        );
+        break;
+      case DoseStatus.pending:
+        leading = Icons.schedule;
+        leadingColor = cs.primary;
+        trailing = Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.medication_outlined,
-                size: 72, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'No medicines added yet',
-              style: Theme.of(context).textTheme.titleMedium,
+            IconButton(
+              tooltip: 'Skip',
+              icon: const Icon(Icons.close),
+              onPressed: () => store.markDose(dose, DoseStatus.skipped),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Tap "Add Medicine" to set up your first reminder.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
+            FilledButton.tonal(
+              onPressed: () => store.markDose(dose, DoseStatus.taken),
+              child: const Text('Take'),
             ),
           ],
-        ),
+        );
+        break;
+    }
+
+    return Card(
+      child: ListTile(
+        leading: Icon(leading, color: leadingColor, size: 32),
+        title: Text(dose.medicineName),
+        subtitle: Text('${dose.dosage} \u2022 $time'),
+        trailing: trailing,
+        onTap: () => pushPage(context, MedicineDetailScreen(medicineId: dose.medicineId)),
       ),
     );
   }
