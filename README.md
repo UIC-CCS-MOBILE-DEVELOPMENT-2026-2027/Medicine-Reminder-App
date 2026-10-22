@@ -1,4 +1,4 @@
-# medminder
+# MedCare
 
 A new Flutter project.
 
