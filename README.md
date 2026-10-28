@@ -1,6 +1,6 @@
 # MedCare
 
-Medminder is a Flutter medicine reminder app designed to make daily medication routines easier to follow. It provides a clear daily schedule, large and easy-to-read controls, and a simple way to track doses.
+MedCare is a Flutter medicine reminder app designed to make daily medication routines easier to follow. It provides a clear daily schedule, large and easy-to-read controls, and a simple way to track doses.
 
 ## Features
 
@@ -64,9 +64,3 @@ lib/
 test/
   widget_test.dart           Basic app and model tests
 ```
-
-## Data and notification behavior
-
-Medicines, settings, and dose history are stored locally with `shared_preferences`; they remain on the device and are not backed up or synchronized across devices. Clearing the app's data or uninstalling it removes this information.
-
-Daily local notifications are scheduled on Android and iOS. The app asks for notification permission when an active medicine reminder is first scheduled. Android reminders use inexact scheduling to avoid requiring exact-alarm access, so delivery can be delayed by Android battery policies. Reminders also depend on device notification settings and should not be treated as a substitute for medical advice or a guaranteed alert. Web and desktop builds currently do not schedule reminders.
