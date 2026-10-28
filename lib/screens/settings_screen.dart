@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/medicine_store.dart';
+import '../utils.dart';
 
 /// Screen 6 - Settings / profile.
 class SettingsScreen extends StatefulWidget {
@@ -37,7 +38,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
-    if (ok == true) _store.clearHistory();
+    if (ok == true && mounted) {
+      await runStoreAction(context, _store.clearHistory);
+    }
   }
 
   @override
@@ -57,14 +60,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   prefixIcon: Icon(Icons.person_outline),
                   border: OutlineInputBorder(),
                 ),
-                onChanged: (v) => _store.updateSettings(name: v),
+                onChanged: (v) => runStoreAction(context, () => _store.updateSettings(name: v)),
               ),
               const SizedBox(height: 12),
               SwitchListTile(
                 title: const Text('Enable reminders'),
-                subtitle: const Text('Turn all medicine notifications on or off'),
+                subtitle: const Text(
+                  'Turn notifications on or off. Allow notifications in device settings.',
+                ),
                 value: _store.remindersEnabled,
-                onChanged: (v) => _store.updateSettings(reminders: v),
+                onChanged: (v) => runStoreAction(context, () => _store.updateSettings(reminders: v)),
               ),
               const SizedBox(height: 8),
               Text('Snooze length', style: Theme.of(context).textTheme.titleMedium),
@@ -76,7 +81,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ButtonSegment(value: 15, label: Text('15 min')),
                 ],
                 selected: {_store.snoozeMinutes},
-                onSelectionChanged: (s) => _store.updateSettings(snooze: s.first),
+                onSelectionChanged: (s) =>
+                    runStoreAction(context, () => _store.updateSettings(snooze: s.first)),
               ),
               const Divider(height: 40),
               ListTile(

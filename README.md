@@ -55,14 +55,18 @@ lib/
   models/medicine.dart       Medicine and dose data models
   screens/                   Home, medicine, history, and settings screens
   services/medicine_store.dart
-                             Shared in-memory medicine and dose state
+                             Shared app state, restored and saved on-device
+  services/storage_service.dart
+                             Local medicine, settings, and dose-history storage
   services/notification_service.dart
-                             Notification service placeholder
+                             Daily Android/iOS local notification scheduling
   utils.dart                 Date labels and navigation helper
 test/
   widget_test.dart           Basic app and model tests
 ```
 
-## Current limitations
+## Data and notification behavior
 
-Medicine, settings, and dose history are currently kept in memory, so they reset when the app is restarted. The notification service is also a placeholder: it logs reminder scheduling actions for development but does not yet deliver operating-system notifications. Persistent storage and platform notification setup are needed before relying on the app for real medication reminders.
+Medicines, settings, and dose history are stored locally with `shared_preferences`; they remain on the device and are not backed up or synchronized across devices. Clearing the app's data or uninstalling it removes this information.
+
+Daily local notifications are scheduled on Android and iOS. The app asks for notification permission when an active medicine reminder is first scheduled. Android reminders use inexact scheduling to avoid requiring exact-alarm access, so delivery can be delayed by Android battery policies. Reminders also depend on device notification settings and should not be treated as a substitute for medical advice or a guaranteed alert. Web and desktop builds currently do not schedule reminders.

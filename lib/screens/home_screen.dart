@@ -219,7 +219,7 @@ class _DoseCard extends StatelessWidget {
         leadingColor = const Color(0xFF176B43);
         status = 'Taken';
         action = TextButton(
-          onPressed: () => store.undoDose(dose),
+          onPressed: () => runStoreAction(context, () => store.undoDose(dose)),
           child: const Text('Undo'),
         );
         break;
@@ -228,7 +228,7 @@ class _DoseCard extends StatelessWidget {
         leadingColor = cs.onSurfaceVariant;
         status = 'Skipped';
         action = TextButton(
-          onPressed: () => store.undoDose(dose),
+          onPressed: () => runStoreAction(context, () => store.undoDose(dose)),
           child: const Text('Undo'),
         );
         break;
@@ -240,7 +240,10 @@ class _DoseCard extends StatelessWidget {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => store.markDose(dose, DoseStatus.skipped),
+                onPressed: () => runStoreAction(
+                  context,
+                  () => store.markDose(dose, DoseStatus.skipped),
+                ),
                 icon: const Icon(Icons.close),
                 label: const Text('Skip'),
               ),
@@ -248,7 +251,10 @@ class _DoseCard extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: FilledButton.icon(
-                onPressed: () => store.markDose(dose, DoseStatus.taken),
+                onPressed: () => runStoreAction(
+                  context,
+                  () => store.markDose(dose, DoseStatus.taken),
+                ),
                 icon: const Icon(Icons.check),
                 label: const Text('Taken'),
               ),

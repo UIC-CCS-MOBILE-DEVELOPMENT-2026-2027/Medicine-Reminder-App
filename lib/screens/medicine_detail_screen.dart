@@ -66,7 +66,7 @@ class MedicineDetailScreen extends StatelessWidget {
                 title: const Text('Reminders active'),
                 subtitle: Text(m.active ? 'You will be reminded daily' : 'Paused'),
                 value: m.active,
-                onChanged: (_) => store.toggleActive(m),
+                onChanged: (_) => runStoreAction(context, () => store.toggleActive(m)),
               ),
               const SizedBox(height: 8),
               Text('Daily reminder times', style: Theme.of(context).textTheme.titleMedium),
@@ -125,9 +125,12 @@ class MedicineDetailScreen extends StatelessWidget {
         ],
       ),
     );
-    if (ok == true) {
-      MedicineStore.instance.deleteMedicine(m.id);
-      navigator.pop();
+    if (ok == true && context.mounted) {
+      final deleted = await runStoreAction(
+        context,
+        () => MedicineStore.instance.deleteMedicine(m.id),
+      );
+      if (deleted && context.mounted) navigator.pop();
     }
   }
 }

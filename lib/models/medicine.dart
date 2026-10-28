@@ -106,4 +106,27 @@ class DoseLog {
   final DateTime scheduled;
   DoseStatus status;
   DateTime? loggedAt;
+
+  factory DoseLog.fromJson(Map<String, dynamic> json) {
+    final statusName = json['status'] as String? ?? DoseStatus.pending.name;
+    return DoseLog(
+      medicineId: json['medicineId'] as String? ?? '',
+      medicineName: json['medicineName'] as String? ?? '',
+      dosage: json['dosage'] as String? ?? '',
+      scheduled: DateTime.parse(json['scheduled'] as String),
+      status: DoseStatus.values.firstWhere((status) => status.name == statusName),
+      loggedAt: json['loggedAt'] == null
+          ? null
+          : DateTime.parse(json['loggedAt'] as String),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'medicineId': medicineId,
+        'medicineName': medicineName,
+        'dosage': dosage,
+        'scheduled': scheduled.toIso8601String(),
+        'status': status.name,
+        'loggedAt': loggedAt?.toIso8601String(),
+      };
 }

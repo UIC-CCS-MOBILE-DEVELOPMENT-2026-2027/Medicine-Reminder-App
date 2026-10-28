@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/medicine.dart';
 import '../services/medicine_store.dart';
+import '../utils.dart';
 
 /// Screen 4 - Add / edit a medicine (pass [medicine] to edit).
 class AddMedicineScreen extends StatefulWidget {
@@ -53,7 +54,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     });
   }
 
-  void _save() {
+  Future<void> _save() async {
     final valid = _formKey.currentState!.validate();
     if (_times.isEmpty) setState(() => _timesError = true);
     if (!valid || _times.isEmpty) return;
@@ -62,26 +63,36 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final existing = widget.medicine;
 
+    final saved = existing != null
+        ? await runStoreAction(context, () async {
+            existing
+              ..name = _name.text.trim()
+              ..dosage = _dosage.text.trim()
+              ..form = _form
+              ..notes = _notes.text.trim()
+              ..times = List.of(_times);
+            await store.updateMedicine(existing);
+          })
+        : await runStoreAction(
+            context,
+            () => store.addMedicine(Medicine(
+              id: DateTime.now().microsecondsSinceEpoch.toString(),
+              name: _name.text.trim(),
+              dosage: _dosage.text.trim(),
+              form: _form,
+              notes: _notes.text.trim(),
+              times: List.of(_times),
+            )),
+          );
+    if (!saved || !mounted) return;
+
     if (existing != null) {
-      existing
-        ..name = _name.text.trim()
-        ..dosage = _dosage.text.trim()
-        ..form = _form
-        ..notes = _notes.text.trim()
-        ..times = List.of(_times);
-      store.updateMedicine(existing);
+      Navigator.of(context).pop();
+      messenger.showSnackBar(const SnackBar(content: Text('Medicine updated')));
     } else {
-      store.addMedicine(Medicine(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        name: _name.text.trim(),
-        dosage: _dosage.text.trim(),
-        form: _form,
-        notes: _notes.text.trim(),
-        times: List.of(_times),
-      ));
+      Navigator.of(context).pop();
+      messenger.showSnackBar(const SnackBar(content: Text('Medicine added')));
     }
-    Navigator.of(context).pop();
-    messenger.showSnackBar(SnackBar(content: Text(_editing ? 'Medicine updated' : 'Medicine added')));
   }
 
   @override

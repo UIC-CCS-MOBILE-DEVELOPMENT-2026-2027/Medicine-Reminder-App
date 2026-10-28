@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
+
 import '../models/medicine.dart';
 import 'notification_service.dart';
+import 'storage_service.dart';
 
-/// In-memory app state shared by all screens (no extra packages needed).
 class MedicineStore extends ChangeNotifier {
-  MedicineStore._() {
-    _seed();
-  }
+  MedicineStore._();
   static final MedicineStore instance = MedicineStore._();
 
+  final StorageService _storage = StorageService();
   final List<Medicine> _medicines = [];
   final List<DoseLog> _logs = [];
+  bool _initialized = false;
 
   String userName = 'Friend';
   bool remindersEnabled = true;
@@ -18,72 +19,101 @@ class MedicineStore extends ChangeNotifier {
 
   List<Medicine> get medicines => List.unmodifiable(_medicines);
 
+  Future<void> initialize() async {
+    if (_initialized) return;
+
+    final medicines = await _storage.loadMedicines();
+    final logs = await _storage.loadDoseLogs();
+    final settings = await _storage.loadSettings();
+
+    _medicines
+      ..clear()
+      ..addAll(medicines);
+    _logs
+      ..clear()
+      ..addAll(logs);
+    userName = settings['userName'] as String? ?? 'Friend';
+    remindersEnabled = settings['remindersEnabled'] as bool? ?? true;
+    snoozeMinutes = settings['snoozeMinutes'] as int? ?? 10;
+    _initialized = true;
+
+    for (final medicine in _medicines) {
+      await _sync(medicine);
+    }
+    notifyListeners();
+  }
+
   Medicine? byId(String id) {
-    for (final m in _medicines) {
-      if (m.id == id) return m;
+    for (final medicine in _medicines) {
+      if (medicine.id == id) return medicine;
     }
     return null;
   }
 
-  // ---- Medicines ----------------------------------------------------------
-
-  void addMedicine(Medicine m) {
-    _medicines.add(m);
-    _sync(m);
+  Future<void> addMedicine(Medicine medicine) async {
+    _medicines.add(medicine);
     notifyListeners();
+    await _storage.saveMedicines(_medicines);
+    await _sync(medicine);
   }
 
-  void updateMedicine(Medicine m) {
-    _dropPending(m.id);
-    _sync(m);
+  Future<void> updateMedicine(Medicine medicine) async {
+    _dropPending(medicine.id);
     notifyListeners();
+    await _storage.saveMedicines(_medicines);
+    await _storage.saveDoseLogs(_logs);
+    await _sync(medicine);
   }
 
-  void toggleActive(Medicine m) {
-    m.active = !m.active;
-    _dropPending(m.id);
-    _sync(m);
+  Future<void> toggleActive(Medicine medicine) async {
+    medicine.active = !medicine.active;
+    _dropPending(medicine.id);
     notifyListeners();
+    await _storage.saveMedicines(_medicines);
+    await _storage.saveDoseLogs(_logs);
+    await _sync(medicine);
   }
 
-  void deleteMedicine(String id) {
-    _medicines.removeWhere((m) => m.id == id);
-    _logs.removeWhere((l) => l.medicineId == id);
-    NotificationService().cancelForMedicine(id);
+  Future<void> deleteMedicine(String id) async {
+    _medicines.removeWhere((medicine) => medicine.id == id);
+    _logs.removeWhere((log) => log.medicineId == id);
     notifyListeners();
+    await _storage.saveMedicines(_medicines);
+    await _storage.saveDoseLogs(_logs);
+    await NotificationService().cancelForMedicine(id);
   }
 
   void _dropPending(String id) =>
-      _logs.removeWhere((l) => l.medicineId == id && l.status == DoseStatus.pending);
+      _logs.removeWhere((log) => log.medicineId == id && log.status == DoseStatus.pending);
 
-  void _sync(Medicine m) {
-    if (remindersEnabled && m.active) {
-      NotificationService().scheduleForMedicine(m);
+  Future<void> _sync(Medicine medicine) async {
+    if (remindersEnabled && medicine.active) {
+      await NotificationService().scheduleForMedicine(medicine);
     } else {
-      NotificationService().cancelForMedicine(m.id);
+      await NotificationService().cancelForMedicine(medicine.id);
     }
   }
-
-  // ---- Doses & history ----------------------------------------------------
 
   List<DoseLog> dosesForToday() {
     final now = DateTime.now();
     final result = <DoseLog>[];
-    for (final m in _medicines.where((m) => m.active)) {
-      for (final t in m.times) {
-        final scheduled = DateTime(now.year, now.month, now.day, t.hour, t.minute);
+    for (final medicine in _medicines.where((medicine) => medicine.active)) {
+      for (final time in medicine.times) {
+        final scheduled =
+            DateTime(now.year, now.month, now.day, time.hour, time.minute);
         DoseLog? log;
-        for (final l in _logs) {
-          if (l.medicineId == m.id && l.scheduled == scheduled) {
-            log = l;
+        for (final existingLog in _logs) {
+          if (existingLog.medicineId == medicine.id &&
+              existingLog.scheduled == scheduled) {
+            log = existingLog;
             break;
           }
         }
         if (log == null) {
           log = DoseLog(
-            medicineId: m.id,
-            medicineName: m.name,
-            dosage: m.dosage,
+            medicineId: medicine.id,
+            medicineName: medicine.name,
+            dosage: medicine.dosage,
             scheduled: scheduled,
           );
           _logs.add(log);
@@ -95,96 +125,66 @@ class MedicineStore extends ChangeNotifier {
     return result;
   }
 
-  void markDose(DoseLog log, DoseStatus status) {
+  Future<void> markDose(DoseLog log, DoseStatus status) async {
     log.status = status;
     log.loggedAt = DateTime.now();
     notifyListeners();
+    await _storage.saveDoseLogs(_logs);
   }
 
-  void undoDose(DoseLog log) {
+  Future<void> undoDose(DoseLog log) async {
     log.status = DoseStatus.pending;
     log.loggedAt = null;
     notifyListeners();
+    await _storage.saveDoseLogs(_logs);
   }
 
   List<DoseLog> history({String? medicineId}) {
     final list = _logs
-        .where((l) => l.status != DoseStatus.pending && (medicineId == null || l.medicineId == medicineId))
+        .where((log) =>
+            log.status != DoseStatus.pending &&
+            (medicineId == null || log.medicineId == medicineId))
         .toList()
       ..sort((a, b) => b.scheduled.compareTo(a.scheduled));
     return list;
   }
 
-  /// Fraction of logged doses that were taken (0..1).
   double get adherence {
-    final h = history();
-    if (h.isEmpty) return 0;
-    return h.where((l) => l.status == DoseStatus.taken).length / h.length;
+    final loggedDoses = history();
+    if (loggedDoses.isEmpty) return 0;
+    return loggedDoses
+            .where((log) => log.status == DoseStatus.taken)
+            .length /
+        loggedDoses.length;
   }
 
-  void clearHistory() {
-    _logs.removeWhere((l) => l.status != DoseStatus.pending);
+  Future<void> clearHistory() async {
+    _logs.removeWhere((log) => log.status != DoseStatus.pending);
     notifyListeners();
+    await _storage.saveDoseLogs(_logs);
   }
 
-  // ---- Settings -----------------------------------------------------------
-
-  void updateSettings({String? name, bool? reminders, int? snooze}) {
-    if (name != null) userName = name.trim().isEmpty ? 'Friend' : name.trim();
-    if (snooze != null) snoozeMinutes = snooze;
-    if (reminders != null && reminders != remindersEnabled) {
-      remindersEnabled = reminders;
-      for (final m in _medicines) {
-        _sync(m);
-      }
+  Future<void> updateSettings({
+    String? name,
+    bool? reminders,
+    int? snooze,
+  }) async {
+    if (name != null) {
+      userName = name.trim().isEmpty ? 'Friend' : name.trim();
     }
+    if (snooze != null) snoozeMinutes = snooze;
+    final remindersChanged = reminders != null && reminders != remindersEnabled;
+    if (reminders != null) remindersEnabled = reminders;
     notifyListeners();
-  }
 
-  // ---- Demo data ----------------------------------------------------------
-
-  void _seed() {
-    final vitD = Medicine(
-      id: 'seed1',
-      name: 'Vitamin D',
-      dosage: '1000 IU',
-      form: 'Capsule',
-      times: const [TimeOfDay(hour: 8, minute: 0)],
-      notes: 'Take with breakfast.',
+    await _storage.saveSettings(
+      userName: userName,
+      remindersEnabled: remindersEnabled,
+      snoozeMinutes: snoozeMinutes,
     );
-    final amox = Medicine(
-      id: 'seed2',
-      name: 'Amoxicillin',
-      dosage: '500 mg',
-      form: 'Capsule',
-      times: const [TimeOfDay(hour: 9, minute: 0), TimeOfDay(hour: 21, minute: 0)],
-      notes: 'Finish the full course.',
-    );
-    final para = Medicine(
-      id: 'seed3',
-      name: 'Paracetamol',
-      dosage: '500 mg',
-      form: 'Tablet',
-      times: const [TimeOfDay(hour: 14, minute: 0)],
-    );
-    _medicines.addAll([vitD, amox, para]);
-
-    final now = DateTime.now();
-    for (var d = 1; d <= 3; d++) {
-      final day = now.subtract(Duration(days: d));
-      for (final m in _medicines) {
-        for (final t in m.times) {
-          final scheduled = DateTime(day.year, day.month, day.day, t.hour, t.minute);
-          final skipped = (d + t.hour) % 5 == 0;
-          _logs.add(DoseLog(
-            medicineId: m.id,
-            medicineName: m.name,
-            dosage: m.dosage,
-            scheduled: scheduled,
-            status: skipped ? DoseStatus.skipped : DoseStatus.taken,
-            loggedAt: scheduled.add(const Duration(minutes: 5)),
-          ));
-        }
+    if (remindersChanged) {
+      for (final medicine in _medicines) {
+        await _sync(medicine);
       }
     }
   }

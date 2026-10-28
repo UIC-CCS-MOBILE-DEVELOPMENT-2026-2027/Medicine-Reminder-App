@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+
+import 'services/medicine_store.dart';
 import 'services/notification_service.dart';
 import 'screens/home_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService().init();
+  await MedicineStore.instance.initialize();
   runApp(const MedicineReminderApp());
 }
 
@@ -15,9 +18,9 @@ class MedicineReminderApp extends StatelessWidget {
   Widget build(BuildContext context) {
     const ink = Color(0xFF18312F);
     final textTheme = ThemeData.light().textTheme.apply(
-          bodyColor: ink,
-          displayColor: ink,
-        );
+      bodyColor: ink,
+      displayColor: ink,
+    );
 
     return MaterialApp(
       title: 'Medminder',
@@ -35,10 +38,22 @@ class MedicineReminderApp extends StatelessWidget {
           bodySmall: textTheme.bodySmall?.copyWith(fontSize: 16),
           bodyMedium: textTheme.bodyMedium?.copyWith(fontSize: 18),
           bodyLarge: textTheme.bodyLarge?.copyWith(fontSize: 20),
-          labelLarge: textTheme.labelLarge?.copyWith(fontSize: 18, fontWeight: FontWeight.w600),
-          titleSmall: textTheme.titleSmall?.copyWith(fontSize: 18, fontWeight: FontWeight.w600),
-          titleMedium: textTheme.titleMedium?.copyWith(fontSize: 20, fontWeight: FontWeight.w600),
-          titleLarge: textTheme.titleLarge?.copyWith(fontSize: 24, fontWeight: FontWeight.w700),
+          labelLarge: textTheme.labelLarge?.copyWith(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+          titleSmall: textTheme.titleSmall?.copyWith(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+          titleMedium: textTheme.titleMedium?.copyWith(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+          titleLarge: textTheme.titleLarge?.copyWith(
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFFF5F7F6),
@@ -58,19 +73,28 @@ class MedicineReminderApp extends StatelessWidget {
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
             minimumSize: const Size(64, 56),
-            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            textStyle: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(64, 56),
-            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            textStyle: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
         textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(
             minimumSize: const Size(64, 52),
-            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            textStyle: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),

@@ -17,3 +17,31 @@ String dayLabel(DateTime d) {
 /// Simple helper so every screen navigates the same way.
 Future<T?> pushPage<T>(BuildContext context, Widget page) =>
     Navigator.of(context).push<T>(MaterialPageRoute(builder: (_) => page));
+
+Future<bool> runStoreAction(
+  BuildContext context,
+  Future<void> Function() action,
+) async {
+  try {
+    await action();
+    return true;
+  } catch (error, stackTrace) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'medicine store',
+      ),
+    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not complete this action. Please check storage and notification permissions.',
+          ),
+        ),
+      );
+    }
+    return false;
+  }
+}
