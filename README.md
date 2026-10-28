@@ -10,7 +10,6 @@ MedCare is a Flutter medicine reminder app designed to make daily medication rou
 - Review dose history and adherence, with filters for taken and skipped doses.
 - Pause or resume reminders for an individual medicine.
 - Set a display name, enable or disable reminders, and choose a snooze length.
-- High-contrast colors, larger text, and generous touch targets for easier use.
 
 ## Requirements
 
