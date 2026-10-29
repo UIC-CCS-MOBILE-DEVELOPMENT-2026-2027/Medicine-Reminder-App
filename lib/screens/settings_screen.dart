@@ -92,7 +92,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('Medicine Reminder'),
+                title: Text('MedCare'),
                 subtitle: Text('Version 1.0.0'),
               ),
             ],

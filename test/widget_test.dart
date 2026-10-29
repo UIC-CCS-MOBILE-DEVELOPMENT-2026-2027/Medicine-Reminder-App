@@ -18,6 +18,7 @@ void main() {
   testWidgets('app loads', (WidgetTester tester) async {
     await tester.pumpWidget(const MedicineReminderApp());
 
+    expect(tester.widget<MaterialApp>(find.byType(MaterialApp)).title, 'MedCare');
     expect(find.text('Hello, Friend'), findsOneWidget);
     expect(find.text("Today's schedule"), findsOneWidget);
   });

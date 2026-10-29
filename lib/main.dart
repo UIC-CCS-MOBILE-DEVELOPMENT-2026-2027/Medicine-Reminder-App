@@ -23,7 +23,7 @@ class MedicineReminderApp extends StatelessWidget {
     );
 
     return MaterialApp(
-      title: 'Medminder',
+      title: 'MedCare',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
